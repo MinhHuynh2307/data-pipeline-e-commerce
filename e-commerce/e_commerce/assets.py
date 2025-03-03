@@ -82,3 +82,55 @@ def orders(duckdb: DuckDBResource) -> dg.MaterializeResult:
                 "preview": dg.MetadataValue.md(preview_df.to_markdown(index=False)),
             }
         )
+    
+
+@dg.asset_check(asset=customers)
+def customers_missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
+    with duckdb.get_connection() as conn:
+        query_result = conn.execute(
+            """
+            select count(*) from customers
+            where ID is null
+            or EMAIL is null
+            """
+        ).fetchone()
+
+        count = query_result[0] if query_result else 0
+        return dg.AssetCheckResult(
+            passed=count == 0, metadata={"missing dimensions": count}
+        )
+    
+
+@dg.asset_check(asset=orders)
+def orders_missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
+    with duckdb.get_connection() as conn:
+        query_result = conn.execute(
+            """
+            select count(*) from orders
+            where ID is null
+            or CUSTOMER__ID is null
+            """
+        ).fetchone()
+
+        count = query_result[0] if query_result else 0
+        return dg.AssetCheckResult(
+            passed=count == 0, metadata={"missing dimensions": count}
+        )
+    
+
+@dg.asset_check(asset=items)
+def items_missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
+    with duckdb.get_connection() as conn:
+        query_result = conn.execute(
+            """
+            select count(*) from items
+            where ORDER_ID is null
+            or ID is null
+            or GIFT_CARD is null
+            """
+        ).fetchone()
+
+        count = query_result[0] if query_result else 0
+        return dg.AssetCheckResult(
+            passed=count == 0, metadata={"missing dimensions": count}
+        )
