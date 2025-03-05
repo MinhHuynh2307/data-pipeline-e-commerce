@@ -2,7 +2,7 @@
 ## Overview
 This data pipeline processes and analyzes e-commerce transaction data to generate business insights. The pipeline is built using Dagster, a data orchestration framework, and DuckDB for data processing and storage.
 ## Architecture
-The pipeline follows a three-stage ETL (Extract, Transform, Load) process:
+The pipeline follows a three-stage processes:
 1. **Ingestion**: Raw data is loaded from CSV files into DuckDB tables
 2. **Cleaning**: Data is validated and cleaned to ensure quality
 3. **Analysis**: Business metrics are calculated and made available for reporting
@@ -39,8 +39,26 @@ These assets generate business insights:
 4. Cancelled Orders: Orders with a non-null CANCELLED_AT value are excluded from analysis.
 5. Data Freshness: The pipeline assumes batch processing of data, not real-time streaming.
 ## Usage
-The pipeline is designed to be run using Dagster's orchestration capabilities. Assets can be materialized individually or as a complete pipeline.
-To run the full pipeline:
+The pipeline is designed to be run using Dagster's orchestration capabilities.
+To run the full pipeline to materialize all assets, do the following steps:
+1. Create and activate a virtual environment
 ```bash
-materialize
+python -m venv e_commerce
 ```
+2. Install Dagster and the required dependencies
+```bash
+pip install dagster dagster-webserver pandas dagster-duckdb
+```
+3. Change working directory to e-commerce
+```bash
+cd e-commerce
+```
+4. start the Dagster webserver
+```bash
+dagster dev
+```
+5. Click the button **Materialize all** to materialize all data assets.
+6. Click on each asset to check metadata (row_count, preview)
+<center>
+<img style="float: center;height:450px;" src="images/asset-preview.png"><br><br>
+</center>
