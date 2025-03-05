@@ -44,6 +44,7 @@ To run the full pipeline to materialize all assets, do the following steps:
 1. Create and activate a virtual environment
 ```bash
 python -m venv e_commerce
+source e_commerce/bin/activate
 ```
 2. Install Dagster and the required dependencies
 ```bash
