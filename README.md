@@ -10,6 +10,7 @@ The pipeline follows a three-stage ETL (Extract, Transform, Load) process:
 <center>
 <img style="float: center;height:450px;" src="images/data-flow.png"><br><br>
 </center>
+
 ## Technologies Used
 1. **Dagster**: Data orchestration framework for defining assets and dependencies
 2. **DuckDB**: In-process SQL OLAP database for data processing
