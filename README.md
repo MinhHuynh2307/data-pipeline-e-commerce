@@ -7,7 +7,9 @@ The pipeline follows a three-stage ETL (Extract, Transform, Load) process:
 2. **Cleaning**: Data is validated and cleaned to ensure quality
 3. **Analysis**: Business metrics are calculated and made available for reporting
 ## Data Flow Diagram
-
+<center>
+<img style="float: center;height:450px;" src="images/data-flow.png"><br><br>
+</center>
 ## Technologies Used
 1. **Dagster**: Data orchestration framework for defining assets and dependencies
 2. **DuckDB**: In-process SQL OLAP database for data processing
