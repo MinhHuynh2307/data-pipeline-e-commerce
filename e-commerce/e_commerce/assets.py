@@ -84,58 +84,6 @@ def orders(duckdb: DuckDBResource) -> dg.MaterializeResult:
         )
     
 
-@dg.asset_check(asset=customers)
-def customers_missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
-    with duckdb.get_connection() as conn:
-        query_result = conn.execute(
-            """
-            select count(*) from customers
-            where ID is null
-            or EMAIL is null
-            """
-        ).fetchone()
-
-        count = query_result[0] if query_result else 0
-        return dg.AssetCheckResult(
-            passed=count == 0, metadata={"missing dimensions": count}
-        )
-    
-
-@dg.asset_check(asset=orders)
-def orders_missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
-    with duckdb.get_connection() as conn:
-        query_result = conn.execute(
-            """
-            select count(*) from orders
-            where ID is null
-            or CUSTOMER__ID is null
-            """
-        ).fetchone()
-
-        count = query_result[0] if query_result else 0
-        return dg.AssetCheckResult(
-            passed=count == 0, metadata={"missing dimensions": count}
-        )
-    
-
-@dg.asset_check(asset=items)
-def items_missing_dimension_check(duckdb: DuckDBResource) -> dg.AssetCheckResult:
-    with duckdb.get_connection() as conn:
-        query_result = conn.execute(
-            """
-            select count(*) from items
-            where ORDER_ID is null
-            or ID is null
-            or GIFT_CARD is null
-            """
-        ).fetchone()
-
-        count = query_result[0] if query_result else 0
-        return dg.AssetCheckResult(
-            passed=count == 0, metadata={"missing dimensions": count}
-        )
-    
-
 @dg.asset(
     compute_kind="duckdb",
     group_name="cleaning",
@@ -148,6 +96,8 @@ def cleaned_customers(duckdb: DuckDBResource) -> dg.MaterializeResult:
             create or replace table cleaned_customers as (
                 select *
                 from customers
+                where ID is not null
+                and EMAIL is not null
             )
             """
         )
@@ -178,6 +128,8 @@ def cleaned_orders(duckdb: DuckDBResource) -> dg.MaterializeResult:
             create or replace view cleaned_orders as (
                 select *
                 from orders
+                where ID is not null
+                and CUSTOMER__ID is not null
             )
             """
         )
@@ -208,6 +160,9 @@ def cleaned_items(duckdb: DuckDBResource) -> dg.MaterializeResult:
             create or replace view cleaned_items as (
                 select *
                 from items
+                where ORDER_ID is not null
+                and ID is not null
+                and GIFT_CARD is not null
             )
             """
         )
