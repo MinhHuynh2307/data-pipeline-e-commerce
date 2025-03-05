@@ -145,20 +145,8 @@ def cleaned_customers(duckdb: DuckDBResource) -> dg.MaterializeResult:
     with duckdb.get_connection() as conn:
         conn.execute(
             """
-            create or replace view cleaned_customers as (
-                select 
-                    ID,
-                    EMAIL,
-                    FIRST_NAME,
-                    LAST_NAME,
-                    PHONE,
-                    STREET_ADDRESS,
-                    CITY,
-                    STATE,
-                    ZIP_CODE,
-                    COUNTRY,
-                    JOIN_DATE,
-                    STATUS
+            create or replace table cleaned_customers as (
+                select *
                 from customers
             )
             """
@@ -188,24 +176,7 @@ def cleaned_orders(duckdb: DuckDBResource) -> dg.MaterializeResult:
         conn.execute(
             """
             create or replace view cleaned_orders as (
-                select 
-                    ID,
-                    CUSTOMER__ID,
-                    ORDER_DATE,
-                    STATUS,
-                    TOTAL_AMOUNT,
-                    TOTAL_TAX,
-                    TOTAL_SHIPPING,
-                    TOTAL_DISCOUNT,
-                    TOTAL_REVENUE,
-                    TOTAL_QUANTITY,
-                    STREET_ADDRESS,
-                    CITY,
-                    STATE,
-                    ZIP_CODE,
-                    COUNTRY,
-                    JOIN_DATE,
-                    STATUS
+                select *
                 from orders
             )
             """
@@ -235,20 +206,7 @@ def cleaned_items(duckdb: DuckDBResource) -> dg.MaterializeResult:
         conn.execute(
             """
             create or replace view cleaned_items as (
-                select 
-                    ID,
-                    ORDER_ID,
-                    ITEM_ID,
-                    QUANTITY,
-                    UNIT_PRICE,
-                    GIFT_CARD,
-                    STREET_ADDRESS,
-                    CITY,
-                    STATE,
-                    ZIP_CODE,
-                    COUNTRY,
-                    JOIN_DATE,
-                    STATUS
+                select *
                 from items
             )
             """
@@ -274,29 +232,37 @@ def cleaned_items(duckdb: DuckDBResource) -> dg.MaterializeResult:
     deps=[cleaned_orders, cleaned_items],
 )
 def top_selling_items(duckdb: DuckDBResource) -> dg.MaterializeResult:
-    """
-    Top-Selling Items by Revenue
+    with duckdb.get_connection() as conn:
+        conn.execute(
+            """
+            create or replace view top_selling_items as (
+                select 
+                    i.NAME AS item_name,
+                    i.SKU,
+                    SUM(i.PRICE * i.QUANTITY) AS total_revenue,
+                    SUM(i.QUANTITY) AS total_quantity_sold
+                from items i
+                join orders o on i.ORDER_ID = o.ID
+                where o.CANCELLED_AT is null
+                group by i.NAME, i.SKU
+                order by total_revenue desc
+                limit 50
+            )
+            """
+        )
 
-    SELECT 
-        i.id AS item_id,
-        i.name AS item_name,
-        SUM(oi.quantity * oi.unit_price) AS total_revenue,
-        SUM(oi.quantity) AS total_quantity_sold
-    FROM 
-        items i
-    JOIN 
-        order_items oi ON i.id = oi.item_id
-    JOIN 
-        orders o ON oi.order_id = o.id
-    WHERE 
-        o.status = 'completed'  -- Only count completed orders
-    GROUP BY 
-        i.id, i.name
-    ORDER BY 
-        total_revenue DESC
-    LIMIT 10;  -- Adjust the limit as needed
-    """
-    pass
+        preview_query = "select * from top_selling_items limit 10"
+        preview_df = conn.execute(preview_query).fetchdf()
+
+        row_count = conn.execute("select count(*) from top_selling_items").fetchone()
+        count = row_count[0] if row_count else 0
+
+        return dg.MaterializeResult(
+            metadata={
+                "row_count": dg.MetadataValue.int(count),
+                "preview": dg.MetadataValue.md(preview_df.to_markdown(index=False)),
+            }
+        )
 
 
 @dg.asset(
@@ -305,28 +271,38 @@ def top_selling_items(duckdb: DuckDBResource) -> dg.MaterializeResult:
     deps=[cleaned_customers, cleaned_orders],
 )
 def most_purchased_customers(duckdb: DuckDBResource) -> dg.MaterializeResult:
-    """
-    Customers with Most Purchases
+    with duckdb.get_connection() as conn:
+        conn.execute(
+            """
+            create or replace view most_purchased_customers as (
+                select 
+                    c.ID AS customer_id,
+                    c.EMAIL AS customer_email,
+                    count(distinct o.ID) AS order_count,
+                    sum(o.TOTAL_PRICE_USD) AS total_spent
+                from customers c
+                join orders o on c.ID = o.CUSTOMER__ID
+                where o.CANCELLED_AT is null
+                group by c.ID, c.EMAIL
+                order by order_count desc, total_spent desc
+                limit 50
+            )
+            """
+        )
 
-    SELECT 
-        c.id AS customer_id,
-        c.name AS customer_name,
-        c.email,
-        COUNT(DISTINCT o.id) AS order_count,
-        SUM(o.total_amount) AS total_spent
-    FROM 
-        customers c
-    JOIN 
-        orders o ON c.id = o.customer_id
-    WHERE 
-        o.status = 'completed'  -- Only count completed orders
-    GROUP BY 
-        c.id, c.name, c.email
-    ORDER BY 
-        order_count DESC, total_spent DESC
-    LIMIT 10;  -- Adjust the limit as needed
-    """
-    pass
+        preview_query = "select * from most_purchased_customers limit 10"
+        preview_df = conn.execute(preview_query).fetchdf()
+
+        row_count = conn.execute("select count(*) from most_purchased_customers").fetchone()
+        count = row_count[0] if row_count else 0
+
+        return dg.MaterializeResult(
+            metadata={
+                "row_count": dg.MetadataValue.int(count),
+                "preview": dg.MetadataValue.md(preview_df.to_markdown(index=False)),
+            }
+        )
+
 
 
 @dg.asset(
@@ -335,27 +311,32 @@ def most_purchased_customers(duckdb: DuckDBResource) -> dg.MaterializeResult:
     deps=[cleaned_orders, cleaned_items],
 )
 def total_revenue_by_category(duckdb: DuckDBResource) -> dg.MaterializeResult:
-    """
-    Total Revenue by Category
+    with duckdb.get_connection() as conn:
+        conn.execute(
+            """
+            create or replace view total_revenue_by_category as (
+                select 
+                    i.SKU,
+                    SUM(i.PRICE * i.QUANTITY) AS total_revenue,
+                from items i
+                join orders o on i.ORDER_ID = o.ID
+                where o.CANCELLED_AT is null
+                group by i.SKU
+                order by total_revenue desc
+            )
+            """
+        )
 
-    SELECT 
-        ic.category_name,
-        SUM(oi.quantity * oi.unit_price) AS total_revenue,
-        COUNT(DISTINCT o.id) AS order_count,
-        COUNT(DISTINCT o.customer_id) AS customer_count
-    FROM 
-        item_categories ic
-    JOIN 
-        items i ON ic.id = i.category_id
-    JOIN 
-        order_items oi ON i.id = oi.item_id
-    JOIN 
-        orders o ON oi.order_id = o.id
-    WHERE 
-        o.status = 'completed'  -- Only count completed orders
-    GROUP BY 
-        ic.category_name
-    ORDER BY 
-        total_revenue DESC;
-    """
-    pass
+        preview_query = "select * from total_revenue_by_category limit 10"
+        preview_df = conn.execute(preview_query).fetchdf()
+
+        row_count = conn.execute("select count(*) from total_revenue_by_category").fetchone()
+        count = row_count[0] if row_count else 0
+
+        return dg.MaterializeResult(
+            metadata={
+                "row_count": dg.MetadataValue.int(count),
+                "preview": dg.MetadataValue.md(preview_df.to_markdown(index=False)),
+            }
+        )
+
